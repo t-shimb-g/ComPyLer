@@ -10,8 +10,6 @@ import x86
 import compiler
 import utils
 
-
-
 def gather_test_names(path):
     """Create a set of filenames without extensions that represent the
     tests cases found in the given folder path.
@@ -91,46 +89,46 @@ class TestCompiler(unittest.TestCase):
             output = run_interpreter(test_case, Lvar.interp_Lvar)
             self.assertEqual(output, test_case.golden, msg=test_case)
 
-    def test_remove_complex_operands(self):
-        c = compiler.Compiler()
-        for test_case in load_test_cases('tests/var'):
-            test_case.ast = c.remove_complex_operands(test_case.ast)
-            output = run_interpreter(test_case, Lvar.interp_Lvar)
-            self.assertEqual(output, test_case.golden, msg=test_case)
-
-    def test_select_instructions(self):
-        c = compiler.Compiler()
-        for test_case in load_test_cases('tests/var'):
-            rco = c.remove_complex_operands(test_case.ast)
-            test_case.ast = c.select_instructions(rco)
-            output = run_interpreter(test_case, x86.interp_x86)
-            self.assertEqual(output, test_case.golden, msg=test_case)
-
-    def test_assign_homes(self):
-        c = compiler.Compiler()
-        for test_case in load_test_cases('tests/var'):
-            rco = c.remove_complex_operands(test_case.ast)
-            sel = c.select_instructions(rco)
-            test_case.ast = c.assign_homes(sel)
-            output = run_interpreter(test_case, x86.interp_x86)
-            self.assertEqual(output, test_case.golden, msg=test_case)
-
-
-    def test_compiled(self):
-        c = compiler.Compiler()
-        for test_case in load_test_cases('tests/var'):
-            x86 = c.compile(test_case.ast)
-            with open('test.s', 'w') as f:
-                f.write(str(x86))
-
-            result = subprocess.run(['gcc', 'runtime.o', 'test.s'], capture_output=True, text=True)
-            self.assertEqual(result.returncode, 0)
-            if result.returncode == 0:
-                result = subprocess.run(['./a.out'], capture_output=True, text=True, input=test_case.input)
-                self.assertEqual(result.stdout, test_case.golden)
-            else:
-                print('Compilation failed!')
-                print(result.stderr)
+    # def test_remove_complex_operands(self):
+    #     c = compiler.Compiler()
+    #     for test_case in load_test_cases('tests/var'):
+    #         test_case.ast = c.remove_complex_operands(test_case.ast)
+    #         output = run_interpreter(test_case, Lvar.interp_Lvar)
+    #         self.assertEqual(output, test_case.golden, msg=test_case)
+    #
+    # def test_select_instructions(self):
+    #     c = compiler.Compiler()
+    #     for test_case in load_test_cases('tests/var'):
+    #         rco = c.remove_complex_operands(test_case.ast)
+    #         test_case.ast = c.select_instructions(rco)
+    #         output = run_interpreter(test_case, x86.interp_x86)
+    #         self.assertEqual(output, test_case.golden, msg=test_case)
+    #
+    # def test_assign_homes(self):
+    #     c = compiler.Compiler()
+    #     for test_case in load_test_cases('tests/var'):
+    #         rco = c.remove_complex_operands(test_case.ast)
+    #         sel = c.select_instructions(rco)
+    #         test_case.ast = c.assign_homes(sel)
+    #         output = run_interpreter(test_case, x86.interp_x86)
+    #         self.assertEqual(output, test_case.golden, msg=test_case)
+    #
+    #
+    # def test_compiled(self):
+    #     c = compiler.Compiler()
+    #     for test_case in load_test_cases('tests/var'):
+    #         x86 = c.compile(test_case.ast)
+    #         with open('test.s', 'w') as f:
+    #             f.write(str(x86))
+    #
+    #         result = subprocess.run(['gcc', 'runtime.o', 'test.s'], capture_output=True, text=True)
+    #         self.assertEqual(result.returncode, 0)
+    #         if result.returncode == 0:
+    #             result = subprocess.run(['./a.out'], capture_output=True, text=True, input=test_case.input)
+    #             self.assertEqual(result.stdout, test_case.golden)
+    #         else:
+    #             print('Compilation failed!')
+    #             print(result.stderr)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

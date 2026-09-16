@@ -1,4 +1,4 @@
-from utils import *
+from Lint import InterpLint
 from ast import *
 
 class InterpLvar(InterpLint):

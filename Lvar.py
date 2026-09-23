@@ -17,5 +17,12 @@ class InterpLvar(InterpLint):
             case _:
                 return super().interp_stmt(s, env, cont)
 
+    def interp(self, p):
+        match p:
+            case Module(body):
+                self.interp_stmts(body, {})
+            case _:
+                raise ValueError(f'unexpected: {print_ast(p)}')
+
 def interp_Lvar(p):
-    return InterpLvar().interp(p)
+    InterpLvar().interp(p)

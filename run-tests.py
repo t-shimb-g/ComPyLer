@@ -89,13 +89,13 @@ class TestCompiler(unittest.TestCase):
             output = run_interpreter(test_case, Lvar.interp_Lvar)
             self.assertEqual(output, test_case.golden, msg=test_case)
 
-    # def test_remove_complex_operands(self):
-    #     c = compiler.Compiler()
-    #     for test_case in load_test_cases('tests/var'):
-    #         test_case.ast = c.remove_complex_operands(test_case.ast)
-    #         output = run_interpreter(test_case, Lvar.interp_Lvar)
-    #         self.assertEqual(output, test_case.golden, msg=test_case)
-    #
+    def test_remove_complex_operands(self):
+        c = compiler.Compiler()
+        for test_case in load_test_cases('tests/var'):
+            test_case.ast = c.remove_complex_operands(test_case.ast)
+            output = run_interpreter(test_case, Lvar.interp_Lvar)
+            self.assertEqual(output, test_case.golden, msg=test_case)
+
     # def test_select_instructions(self):
     #     c = compiler.Compiler()
     #     for test_case in load_test_cases('tests/var'):
@@ -103,7 +103,7 @@ class TestCompiler(unittest.TestCase):
     #         test_case.ast = c.select_instructions(rco)
     #         output = run_interpreter(test_case, x86.interp_x86)
     #         self.assertEqual(output, test_case.golden, msg=test_case)
-    #
+
     # def test_assign_homes(self):
     #     c = compiler.Compiler()
     #     for test_case in load_test_cases('tests/var'):
@@ -112,8 +112,8 @@ class TestCompiler(unittest.TestCase):
     #         test_case.ast = c.assign_homes(sel)
     #         output = run_interpreter(test_case, x86.interp_x86)
     #         self.assertEqual(output, test_case.golden, msg=test_case)
-    #
-    #
+
+
     # def test_compiled(self):
     #     c = compiler.Compiler()
     #     for test_case in load_test_cases('tests/var'):

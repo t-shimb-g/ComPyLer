@@ -2,6 +2,8 @@ import itertools
 from ast import *
 from typing import List, Tuple, Set, Dict
 import subprocess
+
+import utils
 from utils import str_ast, generate_name, label_name, neg64, align
 from x86 import *
 
@@ -19,20 +21,34 @@ class Compiler:
         statements."""
         match e:
             case Constant(n):
-                pass
+                return e, []
 
             case Name(id):
-                pass
+                return e, []
             
             case Call(Name('input_int'), []):
-                pass
+                # TODO: Ensure atomic (for later compiler passes)
+                return e, []
             
             case UnaryOp(USub(), exp):
-                pass
+                atm, temps = self.rco_exp(exp, True)
+                usub = UnaryOp(USub(), atm)
+                if need_atomic:
+                    tmp = Name(generate_name('tmp'))
+                    return tmp, temps + [(tmp, usub)]
+                else:
+                    return usub, temps
                 
             case BinOp(exp1, op, exp2):
-                pass
-            
+                atm1, temps1 = self.rco_exp(exp1, True)
+                atm2, temps2 = self.rco_exp(exp2, True)
+                sum = BinOp(atm1, op, atm2)
+                if need_atomic:
+                    tmp = Name(generate_name('tmp'))
+                    # order of temps1 and temps2 does not matter because unique temporary names (except for exponentiation)
+                    return tmp, temps1 + temps2 + [(tmp, sum)]
+                else:
+                    return sum, temps1 + temps2
             case _:
                 raise ValueError(f'rco_exp unexpected: {str_ast(e)}')
 
@@ -41,11 +57,16 @@ class Compiler:
         """For each statement, collect new atomic expressions and concatenate temporaries"""
         match s:
             case Expr(Call(Name('print'), [exp])):
-                pass
+                atm, temps = self.rco_exp(exp, True)
+                vars = [ Assign([var], value) for var, value in temps ] # vars is creating all the temps we need to finally print (p)
+                p = Expr(Call(Name('print'), [atm]))
+                return vars + [p]
             case Expr(exp):
-                pass
+                # TODO: Ensure atomic (for later compiler passes)
+                return [s]
             case Assign([Name(var)], exp):
-                pass
+                # TODO: Ensure atomic (for later compiler passes)
+                return [s]
             case _:
                 raise ValueError(f'rco_stmt not implemented: {str_ast(s)}')
 
@@ -54,7 +75,9 @@ class Compiler:
         """Transform each statement and expression into atomic expressions"""
         match p:
             case Module(body):
-                pass
+                # flatten list of lists
+                new_body = list(itertools.chain.from_iterable([self.rco_stmt(stmt) for stmt in body]))
+                return Module(new_body)
 
     
     ######################################################################

@@ -34,18 +34,22 @@ class InterpLint:
 
     def interp_stmts(self, ss, env):
         match ss:
-            case[]:
+            case []:
                 return 0
-            case[s, *ss]: # recursive for-loop (unpack first statement, keep rest, interp_stmt)
+            case [s, *ss]: # recursive for-loop (unpack first statement, keep rest, interp_stmt)
                 return self.interp_stmt(s, env, ss)
+            case _:
+                raise NotImplementedError(f'{ss}')
 
     def interp(self, p):
         match p:
             case Module(body):
                 self.interp_stmts(body, {})
+            case _:
+                raise NotImplementedError(f'{p}')
 
 def interp_Lint(p):
-    return InterpLint().interp(p)
+    InterpLint().interp(p)
 
 def pe_neg(r):
     match r:

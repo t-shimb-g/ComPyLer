@@ -64,13 +64,13 @@ class Compiler:
                 p = Expr(Call(Name('print'), [atm]))
                 return vars + [p]
             case Expr(exp):
-                atm, temps = self.rco_exp(exp, False)
+                expr, temps = self.rco_exp(exp, False)
                 vars = [ Assign([var], value) for var, value in temps ]
-                return vars + [Expr(atm)]
+                return vars + [Expr(expr)]
             case Assign([Name(var)], exp):
-                atm, temps = self.rco_exp(exp, False)
+                expr, temps = self.rco_exp(exp, False)
                 vars = [ Assign([var], value) for var, value in temps ]
-                return vars + [Assign([Name(var)], atm)]
+                return vars + [Assign([Name(var)], expr)]
             case _:
                 raise ValueError(f'rco_stmt not implemented: {str_ast(s)}')
 
@@ -141,7 +141,6 @@ class Compiler:
                 
             # lhs = identifier
             case Assign([Name(left)], Name(right)):
-                # TODO: avoid self assignment e.g. x = x means no code
                 if left == right:
                     return []
                 else:

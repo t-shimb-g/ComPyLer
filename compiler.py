@@ -27,7 +27,9 @@ class Compiler:
                 return e, []
             
             case Call(Name('input_int'), []):
-                # TODO: Ensure atomic (for later compiler passes)
+                if need_atomic:
+                    tmp = Name(generate_name('tmp'))
+                    return tmp, [(tmp, e)]
                 return e, []
             
             case UnaryOp(USub(), exp):
@@ -62,11 +64,13 @@ class Compiler:
                 p = Expr(Call(Name('print'), [atm]))
                 return vars + [p]
             case Expr(exp):
-                # TODO: Ensure atomic (for later compiler passes)
-                return [s]
+                atm, temps = self.rco_exp(exp, False)
+                vars = [ Assign([var], value) for var, value in temps ]
+                return vars + [Expr(atm)]
             case Assign([Name(var)], exp):
-                # TODO: Ensure atomic (for later compiler passes)
-                return [s]
+                atm, temps = self.rco_exp(exp, False)
+                vars = [ Assign([var], value) for var, value in temps ]
+                return vars + [Assign([Name(var)], atm)]
             case _:
                 raise ValueError(f'rco_stmt not implemented: {str_ast(s)}')
 
@@ -75,7 +79,7 @@ class Compiler:
         """Transform each statement and expression into atomic expressions"""
         match p:
             case Module(body):
-                # flatten list of lists
+                # flatten list of lists (because rco_stmt returns a list)
                 new_body = list(itertools.chain.from_iterable([self.rco_stmt(stmt) for stmt in body]))
                 return Module(new_body)
 
@@ -88,11 +92,11 @@ class Compiler:
         match e:
             # Name -> Variable
             case Name(id):
-                pass
+                return Variable(id)
 
             # Constant -> Immediate
             case Constant(value):
-                pass
+                return Immediate(value)
 
             # Throw error for _
             case _:
@@ -104,6 +108,12 @@ class Compiler:
         # Add() -> 'addq', also handle Sub and USub
         match op:
             # add code here
+            case Add():
+                return 'addq'
+            case Sub():
+                return 'subq'
+            case USub():
+                return 'negq'
             case _:
                 raise ValueError('select_op unhanded: ' + str_ast(op))
 
@@ -112,11 +122,12 @@ class Compiler:
         match s:
             # print(op) -> [move to rdi, callq print_int]
             case Expr(Call(Name('print'), [operand])):
-                pass
+                src = self.select_arg(operand)
+                return [Instr('movq', [src, Reg('rdi')]), Callq('print_int', 1)]
 
             # input_int() -> callq read_int
             case Expr(Call(Name('input_int'), [])):
-                pass
+                return [Callq('read_int', 0)]
 
             case Expr(_): 
                 return [] # Don't generate asm for unused expressions
@@ -124,11 +135,19 @@ class Compiler:
 
             # lhs = number
             case Assign([lhs], Constant(value)):
-                pass
+                src = self.select_arg(Constant(value))
+                dest = self.select_arg(lhs)
+                return [Instr('movq', [src, dest])]
                 
             # lhs = identifier
             case Assign([Name(left)], Name(right)):
-                pass
+                # TODO: avoid self assignment e.g. x = x means no code
+                if left == right:
+                    return []
+                else:
+                    src = self.select_arg(Name(right))
+                    dest = self.select_arg(Name(left))
+                    return [Instr('movq', [src, dest])]
 
             # unary
             case Assign([lhs], UnaryOp(USub(), Constant(i))):
@@ -137,7 +156,10 @@ class Compiler:
                 return [Instr('movq', [src, dest])]
 
             case Assign([lhs], UnaryOp(op, operand)):
-                pass
+                dest = self.select_arg(lhs)
+                operator = self.select_op(op)
+                src = self.select_arg(operand)
+                return [Instr('movq', [src, dest]), Instr(operator, [dest])]
 
             # binary
             # x = x + y
@@ -149,23 +171,33 @@ class Compiler:
 
             # x = y + x
             case Assign([Name(lhs)], BinOp(left, Add(), Name(right))) if right == lhs:
-                pass
+                dest = self.select_arg(Name(lhs))
+                src = self.select_arg(left)
+                return [Instr('addq', [src, dest])]
             
             # transform x = y - x to x = -x + y
             case Assign([Name(lhs)], BinOp(left, Sub(), Name(right))) if right == lhs:
-                pass
+                dest = self.select_arg(Name(lhs))
+                src = self.select_arg(left)
+                return [Instr('negq', [dest]), Instr('addq', [src, dest])]
 
             # general x = y op z
             case Assign([lhs], BinOp(left, op, right)):
-                pass
+                dest = self.select_arg(lhs)
+                l_arg = self.select_arg(left)
+                r_arg = self.select_arg(right)
+                operator = self.select_op(op)
+                return [Instr('movq', [l_arg, dest]), Instr(operator, [r_arg, dest])]
 
             # transform x = input_int() to (callq read_int; rax -> x)
             case Assign([lhs], Call(Name('input_int'), [])):
-                pass
+                dest = self.select_arg(lhs)
+                return [Callq('read_int', 0), Instr('movq', [Reg('rax'), dest])]
 
             # transform print(x) to (x -> rdi; callq print_int)
             case Assign([lhs], Call(Name('print'), [operand])):
-                pass
+                src = self.select_arg(operand)
+                return [Instr('movq', [src, Reg('rdi')]), Callq('print_int', 1)]
                         
             case _:
                 raise ValueError('select_stmt unhandled: ' + str(s))

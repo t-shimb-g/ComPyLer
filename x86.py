@@ -169,7 +169,7 @@ if __name__ == '__main__':
     
     p = X86Program([
         Instr('movq', [Immediate(1), Reg('rdi')]),
-        Callq('print_int', 1)
+        Callq('read_int', 1)
     ])
 
     x.interp(p)

@@ -192,11 +192,6 @@ class Compiler:
             case Assign([lhs], Call(Name('input_int'), [])):
                 dest = self.select_arg(lhs)
                 return [Callq('read_int', 0), Instr('movq', [Reg('rax'), dest])]
-
-            # transform print(x) to (x -> rdi; callq print_int)
-            case Assign([lhs], Call(Name('print'), [operand])):
-                src = self.select_arg(operand)
-                return [Instr('movq', [src, Reg('rdi')]), Callq('print_int', 1)]
                         
             case _:
                 raise ValueError('select_stmt unhandled: ' + str(s))

@@ -211,7 +211,12 @@ class Compiler:
     def collect_locals_arg(self, a: arg) -> Set[location]:
         """Return set( variable names ), otherwise empty set()"""
         match a:
-            # your code here
+            case Reg():
+                return set([])
+            case Variable():
+                return set([a])
+            case Immediate():
+                return set([])
             case _:
                 raise TypeError(f'unknown arg: {a}')
                 
@@ -220,9 +225,10 @@ class Compiler:
         """For a given instruction i, collect_local_args on it's arguments"""
         match i:
             case Instr(inst, args):
-                pass
+                sets = [self.collect_locals_arg(arg) for arg in args]
+                return set().union(*sets)
             case Callq(func, num_args):
-                return set()
+                return set([])
             case _:
                 raise TypeError(f'unknown instr: {i}')
 
@@ -239,7 +245,13 @@ class Compiler:
         """If a given arg is a Variable, return it's new home address
         on the stack. For all other args, simply return them."""
         match a:
-            # your code here
+            case Variable():
+                if a.id in homes.keys():
+                    return homes[a.id]
+                else:
+                    return a
+            case Reg() | Immediate():
+                return a
             case _:
                 raise TypeError(f'unknown arg: {a}')
 
@@ -247,7 +259,8 @@ class Compiler:
         """Assign homes for each argument in an instruction"""
         match i:
             case Instr(instr, args):
-                pass
+                new_args = [self.assign_homes_arg(arg, homes) for arg in args]
+                return Instr(instr, new_args)
             case Callq(func, num_args):
                 return i
             case _:

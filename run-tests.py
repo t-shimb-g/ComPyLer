@@ -104,14 +104,14 @@ class TestCompiler(unittest.TestCase):
             output = run_interpreter(test_case, x86.interp_x86)
             self.assertEqual(output, test_case.golden, msg=test_case)
 
-    # def test_assign_homes(self):
-    #     c = compiler.Compiler()
-    #     for test_case in load_test_cases('tests/var'):
-    #         rco = c.remove_complex_operands(test_case.ast)
-    #         sel = c.select_instructions(rco)
-    #         test_case.ast = c.assign_homes(sel)
-    #         output = run_interpreter(test_case, x86.interp_x86)
-    #         self.assertEqual(output, test_case.golden, msg=test_case)
+    def test_assign_homes(self):
+        c = compiler.Compiler()
+        for test_case in load_test_cases('tests/var'):
+            rco = c.remove_complex_operands(test_case.ast)
+            sel = c.select_instructions(rco)
+            test_case.ast = c.assign_homes(sel)
+            output = run_interpreter(test_case, x86.interp_x86)
+            self.assertEqual(output, test_case.golden, msg=test_case)
 
 
     # def test_compiled(self):

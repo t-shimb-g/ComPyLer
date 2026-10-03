@@ -1,4 +1,5 @@
 from ast import *
+import platform
 
 # pretty printing ast nodes
 def str_op(op):

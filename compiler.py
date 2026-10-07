@@ -246,8 +246,8 @@ class Compiler:
         on the stack. For all other args, simply return them."""
         match a:
             case Variable():
-                if a.id in homes.keys():
-                    return homes[a.id]
+                if a in homes.keys():
+                    return homes[a]
                 else:
                     return a
             case Reg() | Immediate():
@@ -304,13 +304,15 @@ class Compiler:
         match i:
             case Instr('movq', [src, dest]):
                 if (self.in_memory(src) or self.big_constant(src)) and self.in_memory(dest):
-                    pass
+                    return [Instr('movq', [src, Reg('rax')]), Instr('movq', [Reg('rax'), dest])]
                 else:
                     return [i]
 
             case Instr(inst, [src, dest]):
                 if (self.in_memory(src) and self.in_memory(dest)) or self.big_constant(src):
-                    pass
+                    return [Instr(inst, [src, Reg('rax')]), Instr(inst, [Reg('rax'), dest])]
+                else:
+                    return [i]
 
             case _:
                 return [i]
@@ -340,7 +342,16 @@ class Compiler:
         return to the caller."""
         match p:
             case X86Program(body):
-                pass
+                prelude = [Instr('pushq', [Reg('rbp')]),
+                           Instr('movq', [Reg('rsp'), Reg('rbp')]),
+                           Instr('subq', [Immediate(p.stack_space), Reg('rsp')])
+                           ]
+                conclusion = [Instr('addq', [Immediate(p.stack_space), Reg('rsp')]),
+                              Instr('popq', [Reg('rbp')]),
+                              Instr('retq', [])
+                              ]
+                return X86Program(prelude + body + conclusion)
+
 
 
     def compile(self, program: Module) -> X86Program:

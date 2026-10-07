@@ -32,6 +32,8 @@ def str_ast(ast):
         case Call(func, args):
             args = list(map(str_ast, args))
             return f'Call({str_ast(func)}, [{", ".join(args)}])'
+        case Assign(targets, value):
+            return f'Assign({str_ast(targets[0])}, {str_ast(value)})'
         case Name(id):
             return f"Name('{id}')"
         case _:

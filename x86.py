@@ -44,7 +44,7 @@ class Callq(instr):
     num_args: int
 
     def __str__(self):
-        return f'callq {self.func}'
+        return f'callq {label_name(self.func)}' # fancy new label_name call
 
 
 @dataclass

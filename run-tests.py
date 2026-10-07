@@ -114,21 +114,26 @@ class TestCompiler(unittest.TestCase):
             self.assertEqual(output, test_case.golden, msg=test_case)
 
 
-    # def test_compiled(self):
-    #     c = compiler.Compiler()
-    #     for test_case in load_test_cases('tests/var'):
-    #         x86 = c.compile(test_case.ast)
-    #         with open('test.s', 'w') as f:
-    #             f.write(str(x86))
-    #
-    #         result = subprocess.run(['gcc', 'runtime.o', 'test.s'], capture_output=True, text=True)
-    #         self.assertEqual(result.returncode, 0)
-    #         if result.returncode == 0:
-    #             result = subprocess.run(['./a.out'], capture_output=True, text=True, input=test_case.input)
-    #             self.assertEqual(result.stdout, test_case.golden)
-    #         else:
-    #             print('Compilation failed!')
-    #             print(result.stderr)
+    def test_compiled(self):
+        c = compiler.Compiler()
+        for test_case in load_test_cases('tests/var'):
+            x86 = c.compile(test_case.ast)
+            with open('test.s', 'w') as f:
+                f.write(str(x86))
+
+            result = subprocess.run(['gcc', 'runtime.o', 'test.s'], capture_output=True, text=True)
+            print("GCC stdout:", result.stdout)
+            print("GCC stderr:", result.stderr)
+            print("Input:", repr(test_case.input))
+            print(open("test.s").read())
+
+            self.assertEqual(result.returncode, 0)
+            if result.returncode == 0:
+                result = subprocess.run(['./a.exe'], capture_output=True, text=True, input=test_case.input)
+                self.assertEqual(result.stdout, test_case.golden)
+            else:
+                print('Compilation failed!')
+                print(result.stderr)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

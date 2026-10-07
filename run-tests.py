@@ -122,14 +122,11 @@ class TestCompiler(unittest.TestCase):
                 f.write(str(x86))
 
             result = subprocess.run(['gcc', 'runtime.o', 'test.s'], capture_output=True, text=True)
-            print("GCC stdout:", result.stdout)
-            print("GCC stderr:", result.stderr)
-            print("Input:", repr(test_case.input))
             print(open("test.s").read())
 
             self.assertEqual(result.returncode, 0)
             if result.returncode == 0:
-                result = subprocess.run(['./a.exe'], capture_output=True, text=True, input=test_case.input)
+                result = subprocess.run(['./a.out'], capture_output=True, text=True, input=test_case.input)
                 self.assertEqual(result.stdout, test_case.golden)
             else:
                 print('Compilation failed!')

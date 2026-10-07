@@ -310,7 +310,7 @@ class Compiler:
 
             case Instr(inst, [src, dest]):
                 if (self.in_memory(src) and self.in_memory(dest)) or self.big_constant(src):
-                    return [Instr(inst, [src, Reg('rax')]), Instr(inst, [Reg('rax'), dest])]
+                    return [Instr('movq', [src, Reg('rax')]), Instr(inst, [Reg('rax'), dest])]
                 else:
                     return [i]
 

@@ -7,7 +7,7 @@ from io import StringIO
 import Lint
 import Lvar
 import x86
-import compiler
+import var
 import utils
 
 def gather_test_names(path):

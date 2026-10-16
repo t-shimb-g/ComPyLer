@@ -10,7 +10,7 @@ from x86 import *
 Binding = Tuple[Name, expr]
 Temporaries = List[Binding]
 
-class Compiler:
+class Var:
     ######################################################################
     # Remove complex operands
     ######################################################################

@@ -152,7 +152,11 @@ class RegisterAllocator(var.Var):
 
     def choose_color(self, v, unavailable_colors: dict[Variable, set[int]]) -> int:
         """Choose the lowest color for Vertex v that is not in unavailable_colors"""
-        pass
+        i = 0
+        while True:
+            if i not in unavailable_colors[v]:
+                return i
+            i = i + 1
 
     def color_graph(self, graph: UndirectedAdjList, variables: set[location]) -> tuple[dict[location, int], set[location]]:
         # the saturation of each variable (colors which it cannot be due to adjacent colors)
@@ -189,16 +193,23 @@ class RegisterAllocator(var.Var):
             
         # DSATUR
         while not pq.empty():
-            break
             # pick a random vertex with the highest saturation (least amount of color options left)
+            v = pq.pop()
 
             # find lowest color
+            color = self.choose_color(v, unavailable_colors)
+            colors[v] = color
 
             # if color is larger than available registers (register_for_alloc), then update spill variables
+            if color >= len(registers_for_alloc):
+                spills.update(v)
 
             # for every Variable adjacent to v (ignore registers), update unavailable_colors for each
             # when a node's saturation has changed, use pq.increase_key(node) to update the priority queue
-
+            for u in graph.out[v]:
+                if isinstance(u, Variable):
+                    unavailable_colors[u].update(color)
+                    pq.increase_key(u)
 
         return colors, spills
 
@@ -247,7 +258,9 @@ class RegisterAllocator(var.Var):
 
     def assign_homes(self, pseudo_x86: X86Program) -> X86Program:
         """Override assign_homes from Var to build an interference graph and use it to assign registers"""
-        pass
+        live_after = self.uncover_live(pseudo_x86)
+        graph = self.build_interference(pseudo_x86, live_after)
+        return self.allocate_registers(pseudo_x86, graph)
             
     ###########################################################################
     # Patch Instructions
@@ -255,7 +268,11 @@ class RegisterAllocator(var.Var):
 
     def patch_instr(self, i: instr) -> list[instr]:
         """Remove trivial moves: s -> d if s == d. Pass everything else onto Var's patch_instr"""
-        pass
+        match i:
+            case Instr('movq', [src, dest]) if src == dest:
+                return []
+            case _:
+                return super().patch_instr(i)
 
     def patch_instructions(self, p: X86Program) -> X86Program:
         match p:

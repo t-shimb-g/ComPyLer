@@ -49,7 +49,7 @@ class Deref(arg):
 class instr: ...
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class Callq(instr):
     func: str
     num_args: int
@@ -58,7 +58,7 @@ class Callq(instr):
         return f'callq {label_name(self.func)}'
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class Instr(instr):
     instr: str
     args: tuple[arg, ...]

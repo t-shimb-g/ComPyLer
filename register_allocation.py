@@ -79,8 +79,8 @@ class RegisterAllocator(var.Var):
             case Callq(_, _):
                 # Take into account that caller cannot expect procedure arguments to not be overwritten
                 args_set = set()
-                for arg in range(len(caller_save)):
-                    args_set.union(self.vars_arg(Reg(arg)))
+                for arg in caller_save:
+                    args_set.update(self.vars_arg(Reg(arg)))
                 return args_set
             case _:
                 raise ValueError(f'write_vars unexpected: {i}')
@@ -136,13 +136,13 @@ class RegisterAllocator(var.Var):
                 # Take into account src=dest contain same value, but do not interfere
                 for v in live_after[i]:
                     if v != dest and v != src:
-                        graph.add_edge(v, dest)
+                        graph.add_edge(v.id, dest.id)
             case _:
                 for d in self.write_vars(i):
                     for v in live_after[i]:
                         if d != v:
-                             graph.add_edge(d, v)
-
+                             graph.add_edge(d.id, v.id)
+                             
                     
 
 
@@ -180,7 +180,7 @@ class RegisterAllocator(var.Var):
         # during a function call with arguments and return registers)
         for x in variables:
             adjacent_registers = [y for y in graph.adjacent(x) if y.id in registers]
-            unavailable_colors[x] = set().union([register_color[r.reg] for r in adjacent_registers])
+            unavailable_colors[x] = set().union([register_color[r.id] for r in adjacent_registers])
 
             # put each variable into the priority queue
             pq.push(x)
@@ -202,13 +202,13 @@ class RegisterAllocator(var.Var):
 
             # if color is larger than available registers (register_for_alloc), then update spill variables
             if color >= len(registers_for_alloc):
-                spills.update(v)
+                spills.add(v)
 
             # for every Variable adjacent to v (ignore registers), update unavailable_colors for each
             # when a node's saturation has changed, use pq.increase_key(node) to update the priority queue
             for u in graph.out[v]:
                 if isinstance(u, Variable):
-                    unavailable_colors[u].update(color)
+                    unavailable_colors[u].add(color)
                     pq.increase_key(u)
 
         return colors, spills
@@ -313,12 +313,12 @@ class RegisterAllocator(var.Var):
                          self.prelude_and_conclusion]:
             program = compiler(program)
 
-            return program
+        return program
             
 if __name__ == '__main__':
     text = """
 x = input_int()
-x = input_int()
+y = input_int()
 print((x + y) + 42)
     """
 
@@ -326,9 +326,38 @@ print((x + y) + 42)
     from pathlib import Path
     t = TestCase(Path('tests/var/eg19'))
     ast = t.ast
-    
+
+    ast = parse(text)
+
     r = RegisterAllocator()
     ast = r.remove_complex_operands(ast)
     x86 = r.select_instructions(ast)
     live_after = r.uncover_live(x86)
     g = r.build_interference(x86, live_after)
+    print("=== interference ===")
+    for e in g.edges():
+        print(f"  {e.source} -- {e.target}")
+
+    g.show().render()
+
+    # from run_tests import TestCase
+    # from pathlib import Path
+    #
+    # print(Callq('read_int', 0) == Callq('read_int', 0),
+    #   hash(Callq('read_int', 0)) == hash(Callq('read_int', 0)))
+    #
+    # t = TestCase(Path('tests/var/add-sub'))
+    # r = RegisterAllocator()
+    #
+    # ast = r.remove_complex_operands(t.ast)
+    # x86 = r.select_instructions(ast)
+    # print("=== pseudo-x86 ===");  print(x86)
+    #
+    # live_after = r.uncover_live(x86)          # already prints the trace
+    # g = r.build_interference(x86, live_after)
+    # print("=== interference ===")
+    # for e in g.edges():
+    #     print(f"  {e.source} -- {e.target}")
+    #
+    # homes = r.allocate_registers(x86, g)
+    # print("=== after allocation ===");  print(homes)

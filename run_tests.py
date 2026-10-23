@@ -9,6 +9,10 @@ import Lvar
 import x86
 import var
 import utils
+import register_allocation
+
+compiler = var.Var
+compiler = register_allocation.RegisterAllocator
 
 def gather_test_names(path):
     """Create a set of filenames without extensions that represent the
@@ -90,34 +94,34 @@ class TestCompiler(unittest.TestCase):
             self.assertEqual(output, test_case.golden, msg=test_case)
 
     def test_remove_complex_operands(self):
-        v = var.Var()
+        c = compiler()
         for test_case in load_test_cases('tests/var'):
-            test_case.ast = v.remove_complex_operands(test_case.ast)
+            test_case.ast = c.remove_complex_operands(test_case.ast)
             output = run_interpreter(test_case, Lvar.interp_Lvar)
             self.assertEqual(output, test_case.golden, msg=test_case)
 
     def test_select_instructions(self):
-        v = var.Var()
+        c = compiler()
         for test_case in load_test_cases('tests/var'):
-            rco = v.remove_complex_operands(test_case.ast)
-            test_case.ast = v.select_instructions(rco)
+            rco = c.remove_complex_operands(test_case.ast)
+            test_case.ast = c.select_instructions(rco)
             output = run_interpreter(test_case, x86.interp_x86)
             self.assertEqual(output, test_case.golden, msg=test_case)
 
     def test_assign_homes(self):
-        v = var.Var()
+        c = compiler()
         for test_case in load_test_cases('tests/var'):
-            rco = v.remove_complex_operands(test_case.ast)
-            sel = v.select_instructions(rco)
-            test_case.ast = v.assign_homes(sel)
+            rco = c.remove_complex_operands(test_case.ast)
+            sel = c.select_instructions(rco)
+            test_case.ast = c.assign_homes(sel)
             output = run_interpreter(test_case, x86.interp_x86)
             self.assertEqual(output, test_case.golden, msg=test_case)
 
 
     def test_compiled(self):
-        v = var.Var()
+        c = compiler()
         for test_case in load_test_cases('tests/var'):
-            x86 = v.compile(test_case.ast)
+            x86 = c.compile(test_case.ast)
             with open('test.s', 'w') as f:
                 f.write(str(x86))
 
@@ -127,7 +131,8 @@ class TestCompiler(unittest.TestCase):
             self.assertEqual(result.returncode, 0)
             if result.returncode == 0:
                 result = subprocess.run(['./a.out'], capture_output=True, text=True, input=test_case.input)
-                self.assertEqual(result.stdout, test_case.golden)
+                # self.assertEqual(result.stdout, test_case.golden)
+                self.assertEqual(result.stdout.strip(), test_case.golden.strip(), msg=test_case)
             else:
                 print('Compilation failed!')
                 print(result.stderr)

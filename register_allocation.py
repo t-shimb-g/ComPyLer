@@ -136,13 +136,13 @@ class RegisterAllocator(var.Var):
                 # Take into account src=dest contain same value, but do not interfere
                 for v in live_after[i]:
                     if v != dest and v != src:
-                        graph.add_edge(v.id, dest.id)
+                        graph.add_edge(v, dest)
             case _:
                 for d in self.write_vars(i):
                     for v in live_after[i]:
                         if d != v:
-                             graph.add_edge(d.id, v.id)
-                             
+                             graph.add_edge(d, v)
+
                     
 
 
@@ -316,48 +316,48 @@ class RegisterAllocator(var.Var):
         return program
             
 if __name__ == '__main__':
-    text = """
-x = input_int()
-y = input_int()
-print((x + y) + 42)
-    """
+#     text = """
+# x = input_int()
+# y = input_int()
+# print((x + y) + 42)
+#     """
+
+#     from run_tests import TestCase
+#     from pathlib import Path
+#     t = TestCase(Path('tests/var/eg19'))
+#     ast = t.ast
+
+#     ast = parse(text)
+
+#     r = RegisterAllocator()
+#     ast = r.remove_complex_operands(ast)
+#     x86 = r.select_instructions(ast)
+#     live_after = r.uncover_live(x86)
+#     g = r.build_interference(x86, live_after)
+#     print("=== interference ===")
+#     for e in g.edges():
+#         print(f"  {e.source} -- {e.target}")
+
+#     g.show().render()
 
     from run_tests import TestCase
     from pathlib import Path
-    t = TestCase(Path('tests/var/eg19'))
-    ast = t.ast
-
-    ast = parse(text)
-
+    
+    print(Callq('read_int', 0) == Callq('read_int', 0),
+      hash(Callq('read_int', 0)) == hash(Callq('read_int', 0)))
+    
+    t = TestCase(Path('tests/var/add-sub'))
     r = RegisterAllocator()
-    ast = r.remove_complex_operands(ast)
+    
+    ast = r.remove_complex_operands(t.ast)
     x86 = r.select_instructions(ast)
-    live_after = r.uncover_live(x86)
+    print("=== pseudo-x86 ===");  print(x86)
+    
+    live_after = r.uncover_live(x86)          # already prints the trace
     g = r.build_interference(x86, live_after)
     print("=== interference ===")
     for e in g.edges():
         print(f"  {e.source} -- {e.target}")
-
-    g.show().render()
-
-    # from run_tests import TestCase
-    # from pathlib import Path
-    #
-    # print(Callq('read_int', 0) == Callq('read_int', 0),
-    #   hash(Callq('read_int', 0)) == hash(Callq('read_int', 0)))
-    #
-    # t = TestCase(Path('tests/var/add-sub'))
-    # r = RegisterAllocator()
-    #
-    # ast = r.remove_complex_operands(t.ast)
-    # x86 = r.select_instructions(ast)
-    # print("=== pseudo-x86 ===");  print(x86)
-    #
-    # live_after = r.uncover_live(x86)          # already prints the trace
-    # g = r.build_interference(x86, live_after)
-    # print("=== interference ===")
-    # for e in g.edges():
-    #     print(f"  {e.source} -- {e.target}")
-    #
-    # homes = r.allocate_registers(x86, g)
-    # print("=== after allocation ===");  print(homes)
+    
+    homes = r.allocate_registers(x86, g)
+    print("=== after allocation ===");  print(homes)

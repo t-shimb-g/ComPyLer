@@ -258,9 +258,13 @@ class RegisterAllocator(var.Var):
 
     def assign_homes(self, pseudo_x86: X86Program) -> X86Program:
         """Override assign_homes from Var to build an interference graph and use it to assign registers"""
-        live_after = self.uncover_live(pseudo_x86)
-        graph = self.build_interference(pseudo_x86, live_after)
-        return self.allocate_registers(pseudo_x86, graph)
+        match p:
+            case X86Program(body):
+                live_after = self.uncover_live(p)
+                graph = self.build_interference(p, live_after)
+                return self.allocate_registers(p, graph)
+            case _:
+                raise TypeError(f"Expected X86Program, not {p}")
             
     ###########################################################################
     # Patch Instructions

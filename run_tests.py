@@ -131,8 +131,7 @@ class TestCompiler(unittest.TestCase):
             self.assertEqual(result.returncode, 0)
             if result.returncode == 0:
                 result = subprocess.run(['./a.out'], capture_output=True, text=True, input=test_case.input)
-                # self.assertEqual(result.stdout, test_case.golden)
-                self.assertEqual(result.stdout.strip(), test_case.golden.strip(), msg=test_case)
+                self.assertEqual(result.stdout, test_case.golden, msg=test_case)
             else:
                 print('Compilation failed!')
                 print(result.stderr)

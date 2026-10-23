@@ -89,7 +89,7 @@ class RegisterAllocator(var.Var):
                            live_before: dict[instr, set[location]], live_after: dict[instr, set[location]]):
         # Live after k = live before k+1
         live_after[i] = live_before_succ
-        live_before[i] = (live_after[i] - self.write_vars(i)).union(self.read_vars(i))
+        live_before[i] = (live_after[i] - self.write_vars(i)) | self.read_vars(i)
         
 
     def uncover_live(self, p: X86Program) -> dict[instr, set[location]]:

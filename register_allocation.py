@@ -180,7 +180,7 @@ class RegisterAllocator(var.Var):
         # during a function call with arguments and return registers)
         for x in variables:
             adjacent_registers = [y for y in graph.adjacent(x) if y.id in registers]
-            unavailable_colors[x] = set().union([register_color[r.id] for r in adjacent_registers])
+            unavailable_colors[x] = {register_color[r.id] for r in adjacent_registers} # implicit set creation
 
             # put each variable into the priority queue
             pq.push(x)

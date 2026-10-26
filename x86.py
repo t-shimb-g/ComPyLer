@@ -3,7 +3,6 @@ from collections import defaultdict
 from typing import Iterable
 from utils import label_name, input_int, add64, sub64, neg64, xor64
 
-
 class arg: ...
 class location(arg): ...
 
@@ -106,7 +105,7 @@ class X86Program:
                 result += '\n'
             return result
 
-        else:  # list of instructions
+        else: # list of instructions
             main = label_name('main')
             result = f"\t.globl {main}\n"
             result += f"{main}:\n"
@@ -125,11 +124,13 @@ class X86Emulator:
         self.store(Reg('rsp'), 1024)
         self.store(Reg('rbp'), 1024)
 
+
     def __str__(self):
-        s = f"X86Emulator(\n  registers = { {k: v for k, v in self.registers.items()} }"
-        s += f"\n  memory    = { {k: v for k, v in self.memory.items()} }"
-        s += f"\n  variables = { {k: v for k, v in self.variables.items()} }\n)\n"
+        s = f"X86Emulator(\n  registers = {dict(self.registers)}"
+        s += f"\n  memory    = {dict(self.memory)}"
+        s += f"\n  variables = {dict(self.variables)}\n)\n"
         return s
+
 
     def store(self, a: location, value: int) -> None:
         match a:
@@ -167,8 +168,11 @@ class X86Emulator:
                     # turn list of statments into a single 'main' block
                     body = {'main': body}
 
+
                 self.blocks = body
-                self.interp_instrs(self.blocks['main'])
+
+                entry_point = 'start' if 'start' in self.blocks else 'main'
+                self.interp_instrs(self.blocks[entry_point])
 
     def interp_instrs(self, instrs: list[instr]):
         for i in instrs:
@@ -202,14 +206,16 @@ class X86Emulator:
                     self.store(dest, value)
 
                 case Instr('pushq', [arg]):
-                    self.store(Reg('rsp'), self.load(Reg('rsp')) - 8)  # decrement rsp
+                    # decrement rsp
+                    self.store(Reg('rsp'), self.load(Reg('rsp')) - 8)
                     # save value to top of stack
                     value = self.load(arg)
                     self.store(Deref('rsp', 0), value)
 
                 case Instr('popq', [arg]):
+                    # increment rsp
                     value = self.load(Deref('rsp', 0))
-                    self.store(Reg('rsp'), self.load(Reg('rsp')) + 8)  # increment rsp
+                    self.store(Reg('rsp'), self.load(Reg('rsp')) + 8)
                     self.store(arg, value)
 
                 case Callq('print_int', num_args):
@@ -234,12 +240,12 @@ class X86Emulator:
                         raise ValueError(f'Invalid comparison {i}')
 
                 case Instr('retq', []):
-                    return  # stop running
+                    return # stop running
 
                 case Jump(label):
                     if label in self.blocks.keys():
                         self.interp_instrs(self.blocks[label])
-                        return  # throw away continuations
+                        return # throw away continuations
                     else:
                         print(self.blocks)
                         raise RuntimeError(f'Jump to invalid label: {i}')
@@ -289,6 +295,7 @@ class X86Emulator:
                 case _:
                     raise ValueError(f"unhandled instr: {i}")
 
+
             if self.debug:
                 print(self)
 
@@ -319,13 +326,14 @@ if __name__ == '__main__':
                  Jump('conclusion')],
 
         'false': [Instr('movq', [Immediate(0), Reg('rdi')]),
-                  Jump('conclusion')],
-    })
+                 Jump('conclusion')],
+        })
 
-    p = X86Program({
-        'main': [Instr('pushq', [Reg('rdi')]),
-                 Instr('retq', [])]
-    })
+    # p = X86Program({
+    #     'main': [Instr('pushq', [Reg('rdi')]),
+    #              Instr('retq', [])]
+    #     })
+
 
     x.interp(p)
 

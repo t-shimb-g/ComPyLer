@@ -22,11 +22,9 @@ class Reg(location):
     def __str__(self):
         return f'%{self.id}'
 
-
 @dataclass(frozen=True)
 class ByteReg(Reg):
     pass
-
 
 @dataclass(frozen=True)
 class Variable(location):
@@ -35,7 +33,7 @@ class Variable(location):
     def __str__(self):
         return self.id
 
-
+    
 @dataclass(frozen=True)
 class Deref(arg):
     reg: str
@@ -43,7 +41,6 @@ class Deref(arg):
 
     def __str__(self):
         return f'{self.offset}(%{self.reg})'
-
 
 class instr: ...
 
@@ -87,7 +84,6 @@ class Jump(instr):
     def __str__(self):
         return f'jmp {label_name(self.label)}'
 
-
 @dataclass
 class X86Program:
     body: list[instr] | dict[str, list[instr]]
@@ -104,7 +100,7 @@ class X86Program:
                 result += '\n'.join(f"\t{s}" for s in stmts)
                 result += '\n'
             return result
-
+                
         else: # list of instructions
             main = label_name('main')
             result = f"\t.globl {main}\n"
@@ -112,7 +108,7 @@ class X86Program:
             result += '\n'.join(f"\t{s}" for s in self.body)
             result += '\n'
             return result
-
+        
 
 class X86Emulator:
     def __init__(self, debug=False):
@@ -124,14 +120,14 @@ class X86Emulator:
         self.store(Reg('rsp'), 1024)
         self.store(Reg('rbp'), 1024)
 
-
+    
     def __str__(self):
         s = f"X86Emulator(\n  registers = {dict(self.registers)}"
         s += f"\n  memory    = {dict(self.memory)}"
         s += f"\n  variables = {dict(self.variables)}\n)\n"
         return s
 
-
+        
     def store(self, a: location, value: int) -> None:
         match a:
             case Reg(reg):
@@ -143,6 +139,7 @@ class X86Emulator:
                 self.variables[id] = value
             case _:
                 raise ValueError(f"Cannot store {value} -> {a}")
+
 
     def load(self, a: arg) -> int:
         match a:
@@ -158,6 +155,7 @@ class X86Emulator:
             case _:
                 raise ValueError(f"Cannot load arg: {a}")
 
+
     def interp(self, p: X86Program) -> None:
         match p:
             case X86Program(body):
@@ -168,11 +166,12 @@ class X86Emulator:
                     # turn list of statments into a single 'main' block
                     body = {'main': body}
 
-
+                    
                 self.blocks = body
 
                 entry_point = 'start' if 'start' in self.blocks else 'main'
                 self.interp_instrs(self.blocks[entry_point])
+
 
     def interp_instrs(self, instrs: list[instr]):
         for i in instrs:
@@ -207,7 +206,7 @@ class X86Emulator:
 
                 case Instr('pushq', [arg]):
                     # decrement rsp
-                    self.store(Reg('rsp'), self.load(Reg('rsp')) - 8)
+                    self.store(Reg('rsp'), self.load(Reg('rsp')) - 8) 
                     # save value to top of stack
                     value = self.load(arg)
                     self.store(Deref('rsp', 0), value)
@@ -265,7 +264,7 @@ class X86Emulator:
                         jump = True
                     elif cc == 'ge' and flag in ['g', 'e']:
                         jump = True
-
+                        
                     if jump:
                         if label in self.blocks.keys():
                             self.interp_instrs(self.blocks[label])
@@ -295,7 +294,7 @@ class X86Emulator:
                 case _:
                     raise ValueError(f"unhandled instr: {i}")
 
-
+            
             if self.debug:
                 print(self)
 
@@ -303,10 +302,10 @@ class X86Emulator:
 def interp_x86(p: X86Program):
     X86Emulator().interp(p)
 
-
+            
 if __name__ == '__main__':
     x = X86Emulator(debug=True)
-
+    
     p = X86Program([
         Instr('movq', [Immediate(1), Reg('rdi')]),
         Callq('print_int', 1)
@@ -333,7 +332,7 @@ if __name__ == '__main__':
     #     'main': [Instr('pushq', [Reg('rdi')]),
     #              Instr('retq', [])]
     #     })
-
+                       
 
     x.interp(p)
 

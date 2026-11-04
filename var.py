@@ -40,6 +40,8 @@ class Var:
                     return tmp, temps + [(tmp, usub)]
                 else:
                     return usub, temps
+
+            # TODO: add generic UnaryOp here
                 
             case BinOp(exp1, op, exp2):
                 atm1, temps1 = self.rco_exp(exp1, True)

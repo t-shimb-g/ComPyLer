@@ -2,7 +2,6 @@ from ast import *
 from sys import platform
 from dataclasses import dataclass
 
-
 # pretty printing ast nodes
 def str_op(op):
     """Returns str representation of an operator"""
@@ -79,42 +78,38 @@ def print_ast(ast):
     print(str_ast(ast))
 
 
-# 64-bit integers
-max_int = 2 ** 63 - 1
-min_int = -2 ** 63
-mask = 2 ** 64 - 1
-offset = 2 ** 63
 
+    
+# 64-bit integers
+max_int = 2**63-1
+min_int = -2**63
+mask = 2**64-1
+offset = 2**63
 
 def to_unsigned(x):
     return x & mask
 
-
 def to_signed(x):
     return ((x + offset) & mask) - offset
-
 
 def add64(x, y):
     return to_signed(x + y)
 
-
 def sub64(x, y):
     return to_signed(x - y)
-
 
 def neg64(x):
     return to_signed(-x)
 
-
 def xor64(x, y):
-    return to_signed(x ^ y)
-
+    return to_signed(x^y)
 
 def input_int():
     x = int(input())
     # clamp to 64-bit signed int
     x = min(max_int, max(min_int, x))
     return x
+
 
 # Generate unique names
 name_id = 0
@@ -149,20 +144,17 @@ def unzip(ls):
         xs += [x]
         ys += [y]
     return xs, ys
-
-
+    
 ################################################################################
 # AST types
 ################################################################################
 class Type:
     pass
 
-
 @dataclass(eq=True)
 class IntType(Type):
     def __str__(self):
         return 'int'
-
 
 @dataclass(eq=True)
 class BoolType(Type):
@@ -183,7 +175,6 @@ class CProgram:
 
         return result
 
-
 @dataclass
 class Goto(stmt):
     label: str
@@ -194,7 +185,7 @@ class Goto(stmt):
 
 def make_assigns(bs):
     return [Assign([x], rhs) for (x, rhs) in bs]
-
+    
 
 def make_begin(bs, e):
     if len(bs) > 0:
@@ -209,6 +200,6 @@ class Begin(expr):
     result: expr
 
     def __str__(self):
-        stmts = ''.join([str(s) for s in self.body])
-        end = 'produce ' + str(self.result)
-        return '{\n' + stmts + end + '}'
+        stmts = '\n'.join([str(s) for s in self.body])
+        end = '\n->' + str(self.result)
+        return 'Begin(\n' + stmts + end + ')'

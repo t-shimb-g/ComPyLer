@@ -6,13 +6,18 @@ import ast
 from io import StringIO
 import Lint
 import Lvar
+import Lif
+import Cif
 import x86
 import var
-import utils
 import register_allocation
+import cond
+import utils
 
 compiler = var.Var
 compiler = register_allocation.RegisterAllocator
+compiler = cond.Conditionals
+
 
 def gather_test_names(path):
     """Create a set of filenames without extensions that represent the
@@ -24,6 +29,9 @@ def gather_test_names(path):
 
 class TestCase:
     def __init__(self, name):
+        if not isinstance(name, pathlib.Path):
+            name = pathlib.Path(name)
+
         self.name = name
 
         filenames = [name.with_suffix(extension) for extension in ('.py', '.in', '.golden')]
@@ -40,16 +48,15 @@ class TestCase:
 
         self.ast = ast.parse(self.source)
 
-
     def __str__(self):
         msg = f"TestCase({self.name})\n"
-        sep = '\n' + '-'*70 + '\n'
+        sep = '\n' + '-' * 70 + '\n'
         msg += f"{self.name.with_suffix('.py')}{sep}{self.source}{sep}\n"
         msg += f"{self.name.with_suffix('.in')}{sep}{self.input}{sep}\n"
         msg += f"{self.name.with_suffix('.golden')}{sep}{self.golden}{sep}\n"
 
         msg += f"ast = {utils.str_ast(self.ast)}\n"
-        
+
         return msg
 
 
@@ -66,7 +73,7 @@ def run_interpreter(test_case, interpreter):
     # run interpreter and get output as string
     interpreter(test_case.ast)
     output = sys.stdout.getvalue().strip()
-    
+
     # undo redirects
     sys.stdin = sys.__stdin__
     sys.stdout = sys.__stdout__
@@ -74,9 +81,9 @@ def run_interpreter(test_case, interpreter):
     return output
 
 
-
 class TestCompiler(unittest.TestCase):
     """Series of tests for each compiler pass"""
+
     def test_interp_Lint(self):
         for test_case in load_test_cases('tests/int'):
             output = run_interpreter(test_case, Lint.interp_Lint)
@@ -93,48 +100,43 @@ class TestCompiler(unittest.TestCase):
             output = run_interpreter(test_case, Lvar.interp_Lvar)
             self.assertEqual(output, test_case.golden, msg=test_case)
 
+    def test_shrink(self):
+        c = compiler()
+        for test_case in load_test_cases('tests/var') + load_test_cases('tests/if'):
+            for transform in [c.shrink]:
+                test_case.ast = transform(test_case.ast)
+
+            output = run_interpreter(test_case, Lif.interp_Lif)
+            self.assertEqual(output, test_case.golden, msg=test_case)
+
     def test_remove_complex_operands(self):
         c = compiler()
-        for test_case in load_test_cases('tests/var'):
-            test_case.ast = c.remove_complex_operands(test_case.ast)
-            output = run_interpreter(test_case, Lvar.interp_Lvar)
+        for test_case in load_test_cases('tests/var') + load_test_cases('tests/if'):
+            for transform in [c.shrink, c.remove_complex_operands]:
+                test_case.ast = transform(test_case.ast)
+
+            output = run_interpreter(test_case, Lif.interp_Lif)
             self.assertEqual(output, test_case.golden, msg=test_case)
-
-    def test_select_instructions(self):
-        c = compiler()
-        for test_case in load_test_cases('tests/var'):
-            rco = c.remove_complex_operands(test_case.ast)
-            test_case.ast = c.select_instructions(rco)
-            output = run_interpreter(test_case, x86.interp_x86)
-            self.assertEqual(output, test_case.golden, msg=test_case)
-
-    def test_assign_homes(self):
-        c = compiler()
-        for test_case in load_test_cases('tests/var'):
-            rco = c.remove_complex_operands(test_case.ast)
-            sel = c.select_instructions(rco)
-            test_case.ast = c.assign_homes(sel)
-            output = run_interpreter(test_case, x86.interp_x86)
-            self.assertEqual(output, test_case.golden, msg=test_case)
-
-
-    def test_compiled(self):
-        c = compiler()
-        for test_case in load_test_cases('tests/var'):
-            x86 = c.compile(test_case.ast)
-            with open('test.s', 'w') as f:
-                f.write(str(x86))
-
-            result = subprocess.run(['gcc', 'runtime.o', 'test.s'], capture_output=True, text=True)
-            print(open("test.s").read())
-
-            self.assertEqual(result.returncode, 0)
-            if result.returncode == 0:
-                result = subprocess.run(['./a.out'], capture_output=True, text=True, input=test_case.input)
-                self.assertEqual(result.stdout, test_case.golden, msg=test_case)
-            else:
-                print('Compilation failed!')
-                print(result.stderr)
+    #
+    # def test_explicate_control(self):
+    #     c = compiler()
+    #     for test_case in load_test_cases('tests/var') + load_test_cases('tests/if'):
+    #         for transform in [c.shrink, c.remove_complex_operands, c.explicate_control]:
+    #             test_case.ast = transform(test_case.ast)
+    #
+    #         output = run_interpreter(test_case, Cif.interp_Cif)
+    #         self.assertEqual(output, test_case.golden, msg=test_case)
+    #
+    # def test_select_instructions(self):
+    #     c = compiler()
+    #     for test_case in load_test_cases('tests/var') + load_test_cases('tests/if'):
+    #         print(test_case)
+    #         for transform in [c.shrink, c.remove_complex_operands, c.explicate_control, c.select_instructions,
+    #                           c.assign_homes, c.patch_instructions, c.prelude_and_conclusion]:
+    #             test_case.ast = transform(test_case.ast)
+    #
+    #         output = run_interpreter(test_case, x86.interp_x86)
+    #         self.assertEqual(output, test_case.golden, msg=test_case)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

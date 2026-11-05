@@ -1,3 +1,4 @@
+import itertools
 from ast import *
 from x86 import *
 from utils import *
@@ -21,29 +22,39 @@ class Conditionals(register_allocation.RegisterAllocator):
                 return e
             
             case BinOp(left, op, right):
-                l = self.shrink_exp(left);
+                l = self.shrink_exp(left)
                 r = self.shrink_exp(right)
                 return BinOp(l, op, r)
             
             case UnaryOp(op, operand):
-                pass
+                o = self.shrink_exp(operand)
+                return UnaryOp(op, o)
             
             case Call(func, args):
-                pass
+                fun = self.shrink_exp(func)
+                new_args = [self.shrink_exp(arg) for arg in args]
+                return Call(fun, new_args)
 
             case IfExp(test, body, orelse):
-                pass
+                t = self.shrink_exp(test)
+                b = self.shrink_exp(body)
+                oe = self.shrink_exp(orelse)
+                return IfExp(t, b, oe)
 
             # Replace And with IfExp
             case BoolOp(And(), values):
-                pass
+                e1, e2 = self.shrink_exp(values[0]), self.shrink_exp(values[1])
+                return IfExp(e1, e2, Constant(False)) # e2 if e1 else False
 
             # Replace Or with IfExp
             case BoolOp(Or(), values):
-                pass
+                e1, e2 = self.shrink_exp(values[0]), self.shrink_exp(values[1])
+                return IfExp(e1, Constant(True), e2) # True if e1 else e2
 
             case Compare(left, [op], [right]):
-                pass
+                l = self.shrink_exp(left)
+                r = self.shrink_exp(right)
+                return Compare(l, [op], [r])
             
             case _:
                 raise Exception('shrink_exp: ' + repr(e))
@@ -52,11 +63,20 @@ class Conditionals(register_allocation.RegisterAllocator):
     def shrink_stmt(self, s: stmt) -> stmt:
         match s:
             case Assign(targets, value):
-                pass
+                new_targets = [self.shrink_exp(target) for target in targets]
+                new_value = self.shrink_exp(value)
+                return Assign(new_targets, new_value)
+
             case Expr(value):
-                pass
+                new_value = self.shrink_exp(value)
+                return Expr(new_value)
+
             case If(test, body, orelse):
-                pass
+                new_test = self.shrink_exp(test)
+                new_body = [self.shrink_stmt(stmt) for stmt in body]
+                new_orelse = [self.shrink_stmt(stmt) for stmt in orelse]
+                return If(new_test, new_body, new_orelse)
+
             case _:
                 raise Exception('shrink_stmt: unexpected: ' + repr(s))
 
@@ -64,7 +84,8 @@ class Conditionals(register_allocation.RegisterAllocator):
     def shrink(self, p: Module) -> Module:
         match p:
             case Module(body):
-                pass
+                new_body = [self.shrink_stmt(stmt) for stmt in body]
+                return Module(new_body)
 
     ############################################################################
     # Remove Complex Operands
@@ -74,9 +95,15 @@ class Conditionals(register_allocation.RegisterAllocator):
         match s:
             case If(test, body, orelse):
                 # generate temporaries for test, body, orelse
+                t, t_temps = self.rco_exp(test, False)
+                t_vars = [ Assign([var], value) for var, value in t_temps ]
+                new_body = [self.rco_stmt(stmt) for stmt in body]
+                flattened_body = list(itertools.chain.from_iterable(new_body))
+                new_orelse = [self.rco_stmt(stmt) for stmt in orelse]
+                flattened_orelse = list(itertools.chain.from_iterable(new_orelse))
                 # none need to be atomic
-                pass
-            
+                return t_vars + [If(t, flattened_body, flattened_orelse)]
+
             case _:
                 return super().rco_stmt(s)
 
@@ -84,13 +111,42 @@ class Conditionals(register_allocation.RegisterAllocator):
         match e:
             case IfExp(test, body, orelse):
                 # rco for test, body, orelse
+                atm_test, t_temps = self.rco_exp(test, True)
+                atm_body, b_temps = self.rco_exp(body, True)
+                atm_orelse, oe_temps = self.rco_exp(orelse, True)
+
                 # make Begin blocks for body and orelse
+                new_body = Begin( [Assign([tmp], value) for tmp, value in b_temps], atm_body )
+                new_orelse = Begin( [Assign([tmp], value) for tmp, value in oe_temps], atm_orelse )
+                if_exp = IfExp(atm_test, new_body, new_orelse)
+
                 # if need_atomic == True: generate a temporary for the last expression assigned to
-                pass
+                if need_atomic:
+                    tmp = Name(generate_name('tmp'))
+                    return tmp, t_temps + [(tmp, if_exp)]
+                else:
+                    return if_exp, t_temps
+
             case Compare(left, [op], [right]):
                 # rco for each part
                 # if need_atomic, generate a temporary for last expression
-                pass
+                l, l_temps = self.rco_exp(left, True)
+                r, r_temps = self.rco_exp(right, True)
+                cmp = Compare(l, [op], [r])
+                if need_atomic:
+                    tmp = Name(generate_name('tmp'))
+                    return tmp, l_temps + r_temps + [(tmp, cmp)]
+                else:
+                    return cmp, l_temps + r_temps
+
+            case UnaryOp(op, exp):
+                atm, temps = self.rco_exp(exp, True)
+                uop = UnaryOp(op, atm)
+                if need_atomic:
+                    tmp = Name(generate_name('tmp'))
+                    return tmp, temps + [(tmp, uop)]
+                else:
+                    return uop, temps
                 
             case _:
                 return super().rco_exp(e, need_atomic)
@@ -101,12 +157,15 @@ class Conditionals(register_allocation.RegisterAllocator):
     ############################################################################
 
     def create_block(self, stmts: list[stmt], basic_blocks: dict[str, list[stmt]]) -> list[stmt]:
+        """ Insert labeled blocks into basic_blocks, returns a goto(label)"""
         match stmts:
             case [Goto(l)]:
-                pass
+                return stmts
 
             case _:
-                pass
+                label = generate_name('block')
+                basic_blocks[label] = stmts
+                return [Goto(label)]
 
     def explicate_effect(self, e: expr, cont: list[stmt],
                          basic_blocks: dict[str, list[stmt]]) -> list[stmt]:
@@ -171,13 +230,26 @@ class Conditionals(register_allocation.RegisterAllocator):
                        basic_blocks: dict[str, list[stmt]]) -> list[stmt]:
         match s:
             case Assign([lhs], rhs):
-                pass
+                return self.explicate_assign(rhs, lhs, cont, basic_blocks)
             
             case Expr(value):
-                pass
+                return self.explicate_effect(value, cont, basic_blocks)
             
             case If(test, body, orelse):
-                pass
+                # continuation after If
+                goto = self.create_block(cont, basic_blocks) # jump to after If is done
+
+                # true branch
+                new_body = goto
+                for s in reversed(body):
+                    new_body = self.explicate_stmt(s, new_body, basic_blocks)
+
+                # false branch
+                new_orelse = goto
+                for s in reversed(orelse):
+                    new_orelse = self.explicate_stmt(s, new_orelse, basic_blocks)
+
+                return self.explicate_pred(test, new_body, new_orelse, basic_blocks)
 
             case _:
                 raise Exception('explicate_stmt: unexpected ' + repr(s))

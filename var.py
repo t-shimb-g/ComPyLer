@@ -383,7 +383,7 @@ if __name__ == '__main__':
     #text = "print(5)"
     ast = parse(text)
 
-    c = Compiler()
+    c = Var()
     x86 = c.compile(ast)
 
     with open('test.s', 'w') as f:

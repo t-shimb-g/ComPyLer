@@ -117,15 +117,15 @@ class TestCompiler(unittest.TestCase):
 
             output = run_interpreter(test_case, Lif.interp_Lif)
             self.assertEqual(output, test_case.golden, msg=test_case)
-    #
-    # def test_explicate_control(self):
-    #     c = compiler()
-    #     for test_case in load_test_cases('tests/var') + load_test_cases('tests/if'):
-    #         for transform in [c.shrink, c.remove_complex_operands, c.explicate_control]:
-    #             test_case.ast = transform(test_case.ast)
-    #
-    #         output = run_interpreter(test_case, Cif.interp_Cif)
-    #         self.assertEqual(output, test_case.golden, msg=test_case)
+
+    def test_explicate_control(self):
+        c = compiler()
+        for test_case in load_test_cases('tests/var') + load_test_cases('tests/if'):
+            for transform in [c.shrink, c.remove_complex_operands, c.explicate_control]:
+                test_case.ast = transform(test_case.ast)
+
+            output = run_interpreter(test_case, Cif.interp_Cif)
+            self.assertEqual(output, test_case.golden, msg=test_case)
     #
     # def test_select_instructions(self):
     #     c = compiler()

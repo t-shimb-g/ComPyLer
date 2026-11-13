@@ -82,9 +82,11 @@ class Conditionals(register_allocation.RegisterAllocator):
 
     
     def shrink(self, p: Module) -> Module:
+        # type check = valid user program
         match p:
             case Module(body):
                 new_body = [self.shrink_stmt(stmt) for stmt in body]
+                # type check = pass isn't incorrect
                 return Module(new_body)
 
     ############################################################################
@@ -171,13 +173,19 @@ class Conditionals(register_allocation.RegisterAllocator):
                          basic_blocks: dict[str, list[stmt]]) -> list[stmt]:
         match e:
             case Begin(body, result):
-                pass
+                stmts = self.explicate_effect(result, cont, basic_blocks)
+                for s in reversed(body):
+                    stmts = self.explicate_stmt(s, stmts, basic_blocks)
+                return stmts
             
             case IfExp(test, body, orelse):
-                pass
+                goto_cont = self.create_block(cont, basic_blocks)
+                new_body = self.explicate_effect(body, goto_cont, basic_blocks)
+                new_orelse = self.explicate_effect(orelse, goto_cont, basic_blocks)
+                return self.explicate_pred(test, new_body, new_orelse, basic_blocks)
             
             case Call(func, args):
-                pass
+                return [Expr(e)] + cont
             
             case _:  # no effect, remove this expression
                 return cont
@@ -186,10 +194,16 @@ class Conditionals(register_allocation.RegisterAllocator):
                          basic_blocks: dict[str, list[stmt]]) -> list[stmt]:
         match e:
             case Begin(body, result):
-              pass
+                stmts = self.explicate_assign(result, x, cont, basic_blocks)
+                for s in reversed(body):
+                    stmts = self.explicate_stmt(s, stmts, basic_blocks)
+                return stmts
           
             case IfExp(test, body, orelse):
-                pass
+                goto_cont = self.create_block(cont, basic_blocks)
+                new_body = self.explicate_assign(body, x, goto_cont, basic_blocks)
+                new_orelse = self.explicate_assign(orelse, x, goto_cont, basic_blocks)
+                return self.explicate_pred(test, new_body, new_orelse, basic_blocks)
             
             case _:
                 return [Assign([x], e)] + cont
@@ -197,31 +211,46 @@ class Conditionals(register_allocation.RegisterAllocator):
     def generic_explicate_pred(self, cnd: expr, thn: list[stmt],
                                els: list[stmt],
                                basic_blocks: dict[str, list[stmt]]) -> list[stmt]:
-        pass
+        goto_thn = self.create_block(thn, basic_blocks)
+        goto_els = self.create_block(els, basic_blocks)
+        return [If(Compare(cnd, [Eq()], [Constant(True)]), goto_thn, goto_els)]
 
     def explicate_pred(self, cnd: expr, thn: list[stmt], els: list[stmt],
                        basic_blocks: dict[str, list[stmt]]) -> list[stmt]:
         match cnd:
             case Name(x):
-                pass
-            
+                return self.generic_explicate_pred(cnd, thn, els, basic_blocks)
+
             case Compare(left, [op], [right]):
-                pass
+                goto_thn = self.create_block(thn, basic_blocks) # block.N : thn => goto block.N
+                goto_els = self.create_block(els, basic_blocks)
+                return [If(cnd, goto_thn, goto_els)]
             
-            case Constant(True):
-                pass
+            case Constant(True): # woo go fast!
+                return thn
             
             case Constant(False):
-                pass
+                return els
             
             case UnaryOp(Not(), operand):
-                pass
+                # just swap thn and els
+                new_operand = self.explicate_pred(operand, els, thn, basic_blocks)
+                return new_operand
             
             case Begin(body, result):
-                pass
+                # body : list[stmts, assign(result, value)], result : expr
+                stmts = self.explicate_pred(result, thn, els, basic_blocks)
+                for s in reversed(body):
+                    stmts = self.explicate_stmt(s, stmts, basic_blocks)
+                return stmts
             
             case IfExp(test, body, orelse):
-                pass
+                goto_thn = self.create_block(thn, basic_blocks)
+                goto_els = self.create_block(els, basic_blocks)
+                body_stmts = self.explicate_pred(body, goto_thn, goto_els, basic_blocks)
+                orelse_stmts = self.explicate_pred(orelse, goto_thn, goto_els, basic_blocks)
+                test_stmts = self.explicate_pred(test, body_stmts, orelse_stmts, basic_blocks)
+                return test_stmts
             
             case _:
                 raise Exception('explicate_pred: unexpected ' + repr(cnd))
@@ -345,27 +374,27 @@ class Conditionals(register_allocation.RegisterAllocator):
     def vars_arg(self, a: arg) -> set[location]:
         match a:
             case ByteReg(id):
-                pass
+                return {Reg(byte_to_full_reg[id])}
             case _:
                 return super().vars_arg(a)
 
     def read_vars(self, i: instr) -> set[location]:
         match i:
             case Jump(label):
-                pass
+                return set()
             case JumpIf(cc, label):
-                pass
+                return set()
             case _:
                 return super().read_vars(i)
 
     def write_vars(self, i: instr) -> set[location]:
         match i:
             case Jump(label):
-                pass
+                return set()
             case JumpIf(cc, label):
-                pass
+                return set()
             case Instr('cmpq', args):
-                pass
+                return {Reg('__flag')}
             case _:
                 return super().write_vars(i)
 
@@ -390,20 +419,20 @@ class Conditionals(register_allocation.RegisterAllocator):
                    live_after: dict[instr, set[location]]):
         for (l, ss) in blocks.items():
             print(l + ':\n')
-            i = 0 
+            i = 0
             for s in ss:
                 if i == 0:
                     print('\t\t{' + ', '.join([str(l) for l in live_before[s]]) + '}')
                 print(str(s))
                 print('\t\t{' + ', '.join([str(l) for l in live_after[s]]) + '}')
                 i = i + 1
-                
+
     def trace_live(self, p: X86Program, live_before: dict[instr, set[location]],
                    live_after: dict[instr, set[location]]):
         match p:
             case X86Program(body):
                 self.trace_live_blocks(body, live_before, live_after)
-                
+
     def uncover_live(self, p: X86Program) -> dict[instr, set[location]]:
         match p:
             case X86Program(body):
@@ -432,7 +461,20 @@ class Conditionals(register_allocation.RegisterAllocator):
     # Build Interference
     ############################################################################
 
-    
+    def build_interference_blocks(self, blocks,
+                           live_after: dict[instr, set[location]]) -> UndirectedAdjList:
+        graph = UndirectedAdjList()
+        for (l, ss) in blocks.items():
+            for i in ss:
+                self.interfere_instr(i, graph, live_after)
+        return graph
+
+    def build_interference(self, p: X86Program,
+                           live_after: dict[instr, set[location]]) -> UndirectedAdjList:
+        match p:
+            case X86Program(blocks):
+                return self.build_interference_blocks(blocks, live_after)
+
     def interfere_instr(self, i: instr, graph,
                         live_after: dict[instr, set[location]]):
         match i:
@@ -443,22 +485,6 @@ class Conditionals(register_allocation.RegisterAllocator):
                             graph.add_edge(d, v)
             case _:
                 return super().interfere_instr(i, graph, live_after)
-
-    def build_interference_blocks(self, blocks,
-                           live_after: dict[instr, set[location]]) -> UndirectedAdjList:
-        graph = UndirectedAdjList()
-        for (l, ss) in blocks.items():
-            for i in ss:
-                self.interfere_instr(i, graph, live_after)
-        return graph
-            
-    def build_interference(self, p: X86Program,
-                           live_after: dict[instr, set[location]]) -> UndirectedAdjList:
-        match p:
-            case X86Program(blocks):
-                return self.build_interference_blocks(blocks, live_after)
-
-
 
     ############################################################################
     # Allocate Registers
@@ -476,7 +502,7 @@ class Conditionals(register_allocation.RegisterAllocator):
         new_blocks = {l: self.assign_homes_instrs(ss, home) \
                for (l, ss) in blocks.items()}
         return (new_blocks, used_callee, num_callee, spills)
-    
+
     def allocate_registers(self, p: X86Program,
                            graph: UndirectedAdjList) -> X86Program:
         match p:
@@ -493,13 +519,6 @@ class Conditionals(register_allocation.RegisterAllocator):
     # Assign Homes
     ############################################################################
 
-    def collect_locals_arg(self, a: arg) -> set[location]:
-        match a:
-            case ByteReg(id):
-                return set()
-            case _:
-                return super().collect_locals_arg(a)
-    
     def collect_locals_instr(self, i: instr) -> set[location]:
         match i:
             case JumpIf(cc, label):
@@ -509,12 +528,12 @@ class Conditionals(register_allocation.RegisterAllocator):
             case _:
                 return super().collect_locals_instr(i)
 
-    def assign_homes_arg(self, a: arg, home: dict[location, arg]) -> arg:
+    def collect_locals_arg(self, a: arg) -> set[location]:
         match a:
             case ByteReg(id):
-                return a
+                return set()
             case _:
-                return super().assign_homes_arg(a, home)
+                return super().collect_locals_arg(a)
 
     def assign_homes_instr(self, i: instr, home: dict[location, arg]) -> instr:
         match i:
@@ -525,7 +544,12 @@ class Conditionals(register_allocation.RegisterAllocator):
             case _:
                 return super().assign_homes_instr(i, home)
 
-
+    def assign_homes_arg(self, a: arg, home: dict[location, arg]) -> arg:
+        match a:
+            case ByteReg(id):
+                return a
+            case _:
+                return super().assign_homes_arg(a, home)
 
     ############################################################################
     # Patch Instructions
@@ -547,14 +571,15 @@ class Conditionals(register_allocation.RegisterAllocator):
             case Jump(label):
                 return [i]
             case Instr('cmpq', [left, Immediate(v)]):
-                pass
-            
+                return [Instr('movq', [Immediate(v), Reg('rax')]),
+                        Instr('cmpq', [left, Reg('rax')])]
+
             case Instr('cmpq', [left, right]) if (self.in_memory(left) and self.in_memory(right)):
-                pass
-            
+                return [Instr('movq', [right, Reg('rax')]),
+                        Instr('cmpq', [left, Reg('rax')])]
             case Instr('movzbq', [s, t]) if self.in_memory(t):
-                pass
-            
+                return [Instr('movzbq', [s, Reg('rax')]),
+                        Instr('movq', [Reg('rax'), t])]
             case _:
                 return super().patch_instr(i)
 
@@ -585,7 +610,15 @@ class Conditionals(register_allocation.RegisterAllocator):
                 return X86Program(body)
 
     def compile(self, program: Module) -> X86Program:
-        pass
+        # type check Lif here, in run_tests check before each interpreter BOTH pre and post condition
+        for compiler in [self.shrink, self.remove_complex_operands, self.explicate_control,
+                         self.select_instructions]:
+                         # , self.assign_homes, self.patch_instructions,
+                         # self.prelude_and_conclusion]:
+
+            program = compiler(program)
+
+        return program
 
 
 if __name__ == '__main__':
